@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📌 Weekly Board</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: #5a3820;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    background: #1e0f05;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+    z-index: 100;
+    flex-shrink: 0;
+  }
+  .logo { font-size: 1rem; font-weight: 700; color: #f5deb3; letter-spacing: .06em; white-space: nowrap; }
+  .logo span { color: #c4956a; }
+
+  /* week nav */
+  .week-nav { display: flex; align-items: center; gap: 6px; }
+  .week-nav button {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,0.12); color: #f5deb3;
+    font-size: .95rem; cursor: pointer; transition: background .2s;
+    display: flex; align-items: center; justify-content: center; font-weight: 700;
+  }
+  .week-nav button:hover { background: rgba(255,255,255,0.25); }
+  .week-label {
+    background: rgba(255,255,255,0.12); color: #f5deb3;
+    padding: .28rem .9rem; border-radius: 16px;
+    font-size: .8rem; font-weight: 500; white-space: nowrap;
+  }
+  .today-badge {
+    background: #e74c3c; color: #fff;
+    font-size: .62rem; padding: .05rem .35rem; border-radius: 8px;
+    margin-left: 4px; font-weight: 700;
+  }
+
+  /* cat pills */
+  .cat-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .cat-pill {
+    padding: .22rem .75rem; border-radius: 16px;
+    font-size: .75rem; font-weight: 600; cursor: pointer;
+    border: 2px solid transparent; transition: all .15s;
+    color: #2a1205; white-space: nowrap;
+  }
+  .cat-pill:hover { filter: brightness(1.08); transform: scale(1.05); }
+  .cat-pill.filter-active { border-color: rgba(0,0,0,0.35); box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+  .cat-仕事     { background: #fde68a; }
+  .cat-勉強     { background: #6ee7b7; }
+  .cat-趣味     { background: #fca5a5; }
+  .cat-予定     { background: #bfdbfe; }
+  .cat-買い物   { background: #d8b4fe; }
+
+  .hint { font-size: .68rem; color: rgba(245,222,179,0.45); white-space: nowrap; }
+
+  /* ── CORKBOARD ── */
+  .corkboard {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: #c4956a;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.09) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 80%, rgba(0,0,0,0.09) 0%, transparent 60%),
+      repeating-linear-gradient(0deg,   rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 1px, transparent 1px, transparent 6px),
+      repeating-linear-gradient(90deg,  rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 1px, transparent 1px, transparent 6px),
+      repeating-linear-gradient(45deg,  rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 12px);
+  }
+
+  .empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; color: rgba(90,45,10,0.35);
+    font-size: .88rem; pointer-events: none;
+  }
+  .empty-state .ep { font-size: 2.5rem; opacity: .4; }
+
+  /* ── MEMO CARD ── */
+  .memo-card {
+    position: absolute;
+    width: 140px;
+    cursor: grab;
+    border-radius: 3px;
+    box-shadow: 3px 4px 12px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.15);
+    transition: box-shadow .15s;
+    z-index: 1;
+    touch-action: none;
+  }
+  .memo-card:hover { box-shadow: 5px 7px 20px rgba(0,0,0,0.4); z-index: 50; }
+  .memo-card.dragging { cursor: grabbing; box-shadow: 8px 10px 28px rgba(0,0,0,0.5); z-index: 200; transition: none; }
+
+  /* カラーバー（上部） */
+  .memo-top {
+    height: 26px; border-radius: 3px 3px 0 0;
+    display: flex; align-items: center; padding: 0 7px; gap: 5px; position: relative;
+  }
+  .memo-top.cat-仕事   { background: #fde68a; }
+  .memo-top.cat-勉強   { background: #6ee7b7; }
+  .memo-top.cat-趣味   { background: #fca5a5; }
+  .memo-top.cat-予定   { background: #bfdbfe; }
+  .memo-top.cat-買い物 { background: #d8b4fe; }
+  .pin {
+    width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+    background: radial-gradient(circle at 38% 32%, #ff8080, #c0392b);
+    box-shadow: 0 1px 3px rgba(192,57,43,0.7);
+  }
+  .cat-name { font-size: .6rem; font-weight: 700; color: rgba(40,15,0,0.55); }
+  /* 完了ボタン（カラーバー右上） */
+  .done-quick {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.55); border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 4px; padding: .1rem .4rem;
+    font-size: .6rem; font-weight: 700; color: rgba(40,15,0,0.7);
+    cursor: pointer; font-family: 'Noto Sans JP', sans-serif;
+    transition: background .15s; white-space: nowrap;
+    pointer-events: all;
+  }
+  .done-quick:hover { background: rgba(255,255,255,0.85); }
+  .carryover-badge {
+    position: absolute; bottom: -9px; left: 7px;
+    background: #e74c3c; color: #fff;
+    font-size: .52rem; font-weight: 700;
+    padding: .08rem .3rem; border-radius: 6px;
+    font-family: 'Noto Sans JP', sans-serif;
+    white-space: nowrap;
+  }
+
+  /* メモ本文（罫線） */
+  .memo-body {
+    background: #fafaf6;
+    background-image: repeating-linear-gradient(
+      transparent, transparent 18px, #ddd6ca 18px, #ddd6ca 19px
+    );
+    padding: 6px 8px 8px;
+    min-height: 90px;
+    border-radius: 0 0 3px 3px;
+  }
+  .memo-text {
+    font-family: 'Caveat', cursive;
+    font-size: .95rem; font-weight: 500;
+    color: #222; line-height: 1.45;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .memo-text.done { text-decoration: line-through; color: #aaa; }
+
+  /* アクションボタン（常に表示・下部固定） */
+  .memo-actions {
+    display: flex; gap: 3px; justify-content: center;
+    padding: 5px 6px 6px;
+    background: #f0ede6;
+    border-top: 1px solid #e0d8ce;
+    border-radius: 0 0 3px 3px;
+  }
+  .act-btn {
+    flex: 1;
+    font-size: .62rem; padding: .2rem .3rem;
+    border-radius: 3px; border: 1px solid #ccc;
+    background: #fff; cursor: pointer;
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: background .12s; color: #444;
+    text-align: center; white-space: nowrap;
+    pointer-events: all;
+  }
+  .act-btn:hover { filter: brightness(.93); }
+  .act-btn.done { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+  .act-btn.edit { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+  .act-btn.del  { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+  /* ── MODAL ── */
+  .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 500;
+    align-items: center; justify-content: center;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: #fafaf6; border-radius: 12px; padding: 20px;
+    width: 88%; max-width: 340px;
+    box-shadow: 0 10px 36px rgba(0,0,0,0.45);
+  }
+  .modal h3 { font-size: .92rem; font-weight: 700; color: #3a1a05; margin-bottom: 14px; }
+  .modal label { display: block; font-size: .72rem; color: #888; margin: 10px 0 4px; }
+  .modal textarea, .modal select {
+    width: 100%; border: 1px solid #ddd; border-radius: 6px;
+    padding: .5rem .75rem; font-family: inherit; font-size: .85rem;
+    background: #fff; color: #222;
+  }
+  .modal textarea { min-height: 68px; resize: vertical; user-select: text; }
+  .cat-select-row { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+  .cat-sel-pill {
+    padding: .22rem .7rem; border-radius: 14px;
+    font-size: .72rem; font-weight: 600; cursor: pointer;
+    border: 2px solid transparent; color: #2a1205; transition: border-color .15s;
+  }
+  .cat-sel-pill.selected { border-color: rgba(0,0,0,0.35); }
+  .cat-sel-pill.cat-仕事   { background: #fde68a; }
+  .cat-sel-pill.cat-勉強   { background: #6ee7b7; }
+  .cat-sel-pill.cat-趣味   { background: #fca5a5; }
+  .cat-sel-pill.cat-予定   { background: #bfdbfe; }
+  .cat-sel-pill.cat-買い物 { background: #d8b4fe; }
+  .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+  .modal-btns button {
+    flex: 1; padding: .55rem; border-radius: 6px; border: none;
+    font-family: inherit; font-size: .83rem; font-weight: 700;
+    cursor: pointer; transition: opacity .2s;
+  }
+  .modal-btns button:hover { opacity: .85; }
+  .btn-cancel { background: #e8e2d8; color: #555; }
+  .btn-save   { background: #c4956a; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">📌 Weekly <span>Board</span></div>
+
+  <div class="week-nav">
+    <button onclick="changeWeek(-1)">‹</button>
+    <div class="week-label" id="weekLabel"></div>
+    <button onclick="changeWeek(1)">›</button>
+  </div>
+
+  <div class="cat-row" id="catRow"></div>
+
+  <div class="hint">タップ→追加　長押し→絞り込み</div>
+</div>
+
+<!-- CORKBOARD -->
+<div class="corkboard" id="board">
+  <div class="empty-state" id="emptyState">
+    <div class="ep">📌</div>
+    <div>カテゴリをタップしてメモを貼ろう</div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay" onclick="overlayBg(event)">
+  <div class="modal">
+    <h3 id="modalTitle">📝 メモを貼る</h3>
+    <label>内容</label>
+    <textarea id="memoText" placeholder="タスクや予定を入力..."></textarea>
+    <label>カテゴリ</label>
+    <div class="cat-select-row" id="catSelRow"></div>
+    <label>日付</label>
+    <select id="dateSelect"></select>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn-save" id="saveBtn" onclick="saveTask()">貼る 📌</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATS = ['仕事','勉強','趣味','予定','買い物'];
+const CAT_BG = { 仕事:'#fde68a', 勉強:'#6ee7b7', 趣味:'#fca5a5', 予定:'#bfdbfe', 買い物:'#d8b4fe' };
+const ROTS = [-2.5, 1.8, -1.2, 2.2, -0.8, 1.4, -2, 0.6];
+const KEY = 'weekly_board_v3';
+
+let weekOffset = 0;
+let tasks = loadData();
+let filterCat = null;
+let modalCat = CATS[0];
+let editingId = null;
+
+function loadData() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch(e) { return []; }
+}
+function saveData() { localStorage.setItem(KEY, JSON.stringify(tasks)); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function dstr(d) { return d.toISOString().split('T')[0]; }
+function fmtMD(s) { const d = new Date(s); return `${d.getMonth()+1}/${d.getDate()}`; }
+
+function getWeekDates(off) {
+  const t = new Date(), dow = t.getDay();
+  const mon = new Date(t);
+  mon.setDate(t.getDate() - dow + 1 + off * 7);
+  return Array.from({length:7}, (_,i) => { const d = new Date(mon); d.setDate(mon.getDate()+i); return d; });
+}
+
+function rot(id) { return ROTS[parseInt(id.slice(-4), 16) % ROTS.length]; }
+
+// ── 自動持ち越し（起動時のみ）──
+function applyCarryover() {
+  const thisMon = new Date(getWeekDates(0)[0]);
+  const weekStart = dstr(thisMon);
+  let changed = false;
+  tasks.forEach(t => {
+    if (t.done || t.date >= weekStart) return;
+    const taskDate = new Date(t.date);
+    const wDiff = Math.round((thisMon - taskDate) / (7*86400000));
+    if (wDiff <= 0) return;
+    const dow = taskDate.getDay();
+    const newDate = new Date(thisMon);
+    newDate.setDate(thisMon.getDate() + (dow === 0 ? 6 : dow - 1));
+    const nd = dstr(newDate);
+    if (t.date !== nd) {
+      t.carryover = (t.carryover || 0) + wDiff;
+      t.date = nd;
+      // 持ち越し時は位置をリセット（新しい週のボードに自然配置）
+      delete t.x; delete t.y;
+      changed = true;
+    }
+  });
+  if (changed) saveData();
+}
+
+// ── Render ──
+function render() {
+  const dates = getWeekDates(weekOffset);
+  const today = todayStr();
+  const isThisWeek = dates.some(d => dstr(d) === today);
+
+  // week label
+  const lbl = document.getElementById('weekLabel');
+  lbl.innerHTML = `${fmtMD(dstr(dates[0]))} 〜 ${fmtMD(dstr(dates[6]))}` +
+    (isThisWeek ? '<span class="today-badge">今週</span>' : '');
+
+  // cat pills
+  const catRow = document.getElementById('catRow');
+  catRow.innerHTML = '';
+  CATS.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = `cat-pill cat-${c}${filterCat===c?' filter-active':''}`;
+    btn.textContent = c;
+    let timer = null;
+    // PC
+    btn.addEventListener('mousedown', () => { timer = setTimeout(() => { timer=null; filterCat = filterCat===c?null:c; render(); }, 500); });
+    btn.addEventListener('mouseup',   () => { if(timer){ clearTimeout(timer); timer=null; openModal(c); } });
+    btn.addEventListener('mouseleave',() => { if(timer){ clearTimeout(timer); timer=null; } });
+    // touch
+    btn.addEventListener('touchstart', e => { e.preventDefault(); timer = setTimeout(() => { timer=null; filterCat=filterCat===c?null:c; render(); }, 500); }, {passive:false});
+    btn.addEventListener('touchend',   () => { if(timer){ clearTimeout(timer); timer=null; openModal(c); } });
+    catRow.appendChild(btn);
+  });
+
+  // date select
+  const DS = document.getElementById('dateSelect');
+  const DAYS = ['日','月','火','水','木','金','土'];
+  DS.innerHTML = dates.map(d => {
+    const s = dstr(d), isT = s===today;
+    return `<option value="${s}">${fmtMD(s)}（${DAYS[d.getDay()]}）${isT?' ← 今日':''}`;
+  }).join('');
+  if (dates.some(d => dstr(d) === today)) DS.value = today;
+
+  // cards
+  const board = document.getElementById('board');
+  board.querySelectorAll('.memo-card').forEach(el => el.remove());
+
+  const weekDstrs = dates.map(d => dstr(d));
+  let visible = tasks.filter(t => weekDstrs.includes(t.date));
+  if (filterCat) visible = visible.filter(t => t.cat === filterCat);
+
+  document.getElementById('emptyState').style.display = visible.length ? 'none' : 'flex';
+
+  const boardW = board.clientWidth;
+  const boardH = board.clientHeight;
+
+  visible.forEach((t, i) => {
+    // 位置が未設定なら自動配置
+    if (t.x === undefined || t.y === undefined) {
+      const cols = Math.max(1, Math.floor(boardW / 170));
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      t.x = 20 + col * 165 + (Math.random() * 20 - 10);
+      t.y = 20 + row * 175 + (Math.random() * 20 - 10);
+      saveData();
+    }
+    board.appendChild(makeCard(t, boardW, boardH));
+  });
+}
+
+function makeCard(t, boardW, boardH) {
+  const el = document.createElement('div');
+  el.className = 'memo-card';
+  el.id = 'card-' + t.id;
+  el.style.left = clamp(t.x, 0, boardW - 145) + 'px';
+  el.style.top  = clamp(t.y, 0, boardH - 160) + 'px';
+  el.style.transform = `rotate(${rot(t.id)}deg)`;
+
+  el.innerHTML = `
+    <div class="memo-top cat-${t.cat}">
+      <div class="pin"></div>
+      <span class="cat-name">${t.cat}</span>
+      ${t.carryover ? `<span class="carryover-badge">${t.carryover}週間持ち越し</span>` : ''}
+    </div>
+    <div class="memo-body">
+      <div class="memo-text${t.done?' done':''}">${esc(t.text)}</div>
+    </div>
+    <div class="memo-actions">
+      <button class="act-btn done" onclick="delTask('${t.id}')">✓ 完了</button>
+      <button class="act-btn edit" onclick="editTask('${t.id}')">✎ 編集</button>
+      <button class="act-btn del"  onclick="delTask('${t.id}')">✕ 削除</button>
+    </div>
+  `;
+
+  makeDraggable(el, t);
+  return el;
+}
+
+function clamp(v, min, max) { return Math.min(Math.max(v, min), max); }
+
+// ── Drag to reposition ──
+function makeDraggable(el, t) {
+  let startX, startY, startL, startT, dragging = false;
+
+  function onStart(cx, cy) {
+    dragging = true;
+    startX = cx; startY = cy;
+    startL = parseFloat(el.style.left) || 0;
+    startT = parseFloat(el.style.top) || 0;
+    el.classList.add('dragging');
+    el.style.zIndex = 200;
+  }
+  function onMove(cx, cy) {
+    if (!dragging) return;
+    const board = document.getElementById('board');
+    const nx = startL + (cx - startX);
+    const ny = startT + (cy - startY);
+    el.style.left = clamp(nx, 0, board.clientWidth  - 145) + 'px';
+    el.style.top  = clamp(ny, 0, board.clientHeight - 160) + 'px';
+  }
+  function onEnd() {
+    if (!dragging) return;
+    dragging = false;
+    el.classList.remove('dragging');
+    el.style.zIndex = '';
+    t.x = parseFloat(el.style.left);
+    t.y = parseFloat(el.style.top);
+    saveData();
+  }
+
+  // mouse
+  el.addEventListener('mousedown', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    onStart(e.clientX, e.clientY);
+    document.addEventListener('mousemove', mm);
+    document.addEventListener('mouseup', mu, {once:true});
+  });
+  function mm(e) { onMove(e.clientX, e.clientY); }
+  function mu()  { onEnd(); document.removeEventListener('mousemove', mm); }
+
+  // touch
+  el.addEventListener('touchstart', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    const t0 = e.touches[0];
+    onStart(t0.clientX, t0.clientY);
+  }, {passive:true});
+  el.addEventListener('touchmove', e => {
+    const t0 = e.touches[0];
+    onMove(t0.clientX, t0.clientY);
+  }, {passive:true});
+  el.addEventListener('touchend', onEnd);
+}
+
+// ── Task ops ──
+function toggleDone(id) {
+  const t = tasks.find(x => x.id===id);
+  if (t) { t.done = !t.done; saveData(); render(); }
+}
+function delTask(id) {
+  tasks = tasks.filter(x => x.id!==id);
+  saveData(); render();
+}
+
+// ── Modal ──
+function openModal(presetCat) {
+  editingId = null;
+  if (presetCat) modalCat = presetCat;
+  document.getElementById('modalTitle').textContent = '📝 メモを貼る';
+  document.getElementById('saveBtn').textContent = '貼る 📌';
+  document.getElementById('memoText').value = '';
+  renderCatSel();
+  document.getElementById('overlay').classList.add('show');
+  setTimeout(() => document.getElementById('memoText').focus(), 100);
+}
+function editTask(id) {
+  const t = tasks.find(x => x.id===id);
+  if (!t) return;
+  editingId = id; modalCat = t.cat;
+  document.getElementById('modalTitle').textContent = '✎ メモを修正';
+  document.getElementById('saveBtn').textContent = '保存 ✓';
+  document.getElementById('memoText').value = t.text;
+  renderCatSel();
+  document.getElementById('overlay').classList.add('show');
+  setTimeout(() => {
+    document.getElementById('dateSelect').value = t.date;
+    document.getElementById('memoText').focus();
+  }, 50);
+}
+function renderCatSel() {
+  document.getElementById('catSelRow').innerHTML = CATS.map(c =>
+    `<div class="cat-sel-pill cat-${c}${modalCat===c?' selected':''}" onclick="selCat('${c}')">${c}</div>`
+  ).join('');
+}
+function selCat(c) {
+  modalCat = c;
+  document.querySelectorAll('.cat-sel-pill').forEach(p => p.classList.toggle('selected', p.textContent===c));
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('memoText').value = '';
+  editingId = null;
+}
+function overlayBg(e) { if (e.target===e.currentTarget) closeModal(); }
+function saveTask() {
+  const text = document.getElementById('memoText').value.trim();
+  if (!text) { document.getElementById('memoText').focus(); return; }
+  const date = document.getElementById('dateSelect').value;
+  if (editingId) {
+    const t = tasks.find(x => x.id===editingId);
+    if (t) { t.text=text; t.cat=modalCat; t.date=date; }
+  } else {
+    tasks.push({ id: Date.now().toString(), text, cat:modalCat, date, done:false, carryover:0 });
+  }
+  saveData(); closeModal(); render();
+}
+
+function changeWeek(off) {
+  weekOffset = off===0 ? 0 : weekOffset+off;
+  render();
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ── Init ──
+applyCarryover();
+render();
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>
